@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Markdown 阅读器 · 支持 ECharts 与导出</title>
+<style>
+  :root{
+    --bg:#f4f6f8;
+    --card:#ffffff;
+    --ink:#1f2328;
+    --muted:#6b7280;
+    --accent:#2f6fed;
+    --border:#e5e7eb;
+    --code-bg:#101827;
+    --shadow:0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.04);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC","Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.75;
+    font-size:16px;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    box-shadow:var(--shadow);
+    padding:10px 18px;
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  header .brand{display:flex;align-items:center;gap:10px;min-width:0;}
+  header .logo{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--accent),#7c5cff);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:16px;
+  }
+  header h1{font-size:16px;margin:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;}
+  header .sub{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;}
+  .spacer{flex:1 1 auto;}
+  .hint{font-size:12px;color:var(--muted);white-space:nowrap;}
+  .btn{
+    appearance:none;border:1px solid var(--border);background:var(--card);
+    color:var(--ink);padding:8px 13px;border-radius:8px;font-size:14px;
+    cursor:pointer;transition:.15s;font-family:inherit;white-space:nowrap;
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .btn.primary:hover{background:#2459c9;color:#fff;}
+  .btn.big{padding:11px 22px;font-size:15px;}
+  .btn.ghost{display:none;}
+  .btn:disabled{opacity:.55;cursor:not-allowed;}
+
+  /* ---------- 导出下拉 ---------- */
+  .dropdown{position:relative;}
+  .dropdown .menu{
+    position:absolute;right:0;top:calc(100% + 6px);
+    background:var(--card);border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 8px 28px rgba(0,0,0,.14);min-width:200px;padding:6px;
+    display:none;z-index:60;
+  }
+  .dropdown.open .menu{display:block;}
+  .dropdown .menu button{
+    display:block;width:100%;text-align:left;border:none;background:none;
+    padding:9px 12px;border-radius:7px;font-size:14px;cursor:pointer;font-family:inherit;color:var(--ink);
+  }
+  .dropdown .menu button:hover{background:#eef2f8;color:var(--accent);}
+  .dropdown .menu .label{font-size:11px;color:var(--muted);padding:7px 12px 3px;}
+
+  /* ---------- 布局 ---------- */
+  .layout{display:flex;max-width:1200px;margin:0 auto;align-items:flex-start;}
+
+  nav#toc{
+    flex:0 0 256px;width:256px;
+    position:sticky;top:66px;
+    max-height:calc(100vh - 82px);overflow-y:auto;
+    padding:20px 12px 20px 20px;font-size:14px;
+  }
+  nav#toc .toc-title{font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:0 0 8px 10px;}
+  nav#toc ul{list-style:none;margin:0;padding:0;}
+  nav#toc a{
+    display:block;color:var(--ink);text-decoration:none;
+    padding:6px 10px;border-radius:7px;line-height:1.45;
+    border-left:2px solid transparent;
+  }
+  nav#toc a:hover{background:#eef2f8;color:var(--accent);}
+  nav#toc a.active{background:#eaf1fd;color:var(--accent);border-left-color:var(--accent);}
+  nav#toc .lvl3{padding-left:26px;font-size:13px;color:var(--muted);}
+
+  main#content{
+    flex:1 1 auto;min-width:0;
+    background:var(--card);
+    margin:20px;border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:36px 44px 60px;
+    min-height:60vh;
+  }
+
+  /* ---------- 空状态 / 拖放区 ---------- */
+  .empty-state{
+    text-align:center;padding:70px 20px;color:var(--muted);
+    border:2px dashed var(--border);border-radius:14px;margin:20px 0;cursor:pointer;
+    transition:.15s;
+  }
+  .empty-state:hover{border-color:var(--accent);background:#f7faff;}
+  .empty-state .empty-icon{font-size:44px;margin-bottom:10px;}
+  .empty-state h2{font-size:22px;color:var(--ink);margin:0 0 6px;}
+  .empty-state p{margin:6px 0;}
+  .empty-state .empty-sub{font-size:13px;}
+  .empty-state .btn{margin-top:18px;}
+  body.dragging::after{
+    content:"松开以载入 Markdown 文件";
+    position:fixed;inset:0;z-index:100;
+    background:rgba(47,111,237,.12);
+    border:3px dashed var(--accent);
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;color:var(--accent);font-weight:700;
+  }
+
+  /* ---------- 正文排版 ---------- */
+  main h1{font-size:30px;line-height:1.3;margin:0 0 6px;letter-spacing:.01em;}
+  main h2{font-size:23px;margin:40px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--border);line-height:1.35;}
+  main h3{font-size:19px;margin:28px 0 10px;line-height:1.4;}
+  main p{margin:12px 0;}
+  main a{color:var(--accent);}
+  main strong{color:#0f172a;}
+  main ul,main ol{padding-left:26px;margin:12px 0;}
+  main li{margin:6px 0;}
+  main hr{border:none;border-top:1px solid var(--border);margin:32px 0;}
+  main blockquote{margin:16px 0;padding:12px 18px;background:#f6f8fb;border-left:4px solid var(--accent);border-radius:0 8px 8px 0;color:#374151;}
+  main blockquote p{margin:4px 0;}
+
+  main table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14.5px;border:1px solid var(--border);border-radius:10px;overflow:hidden;display:block;overflow-x:auto;white-space:nowrap;}
+  main th,main td{padding:10px 14px;border:1px solid var(--border);text-align:left;vertical-align:top;}
+  main thead th{background:#f0f4fa;font-weight:700;color:#0f172a;}
+  main tbody tr:nth-child(even){background:#fafbfc;}
+
+  main pre{background:var(--code-bg);color:#e6edf3;padding:16px 18px;border-radius:10px;overflow-x:auto;font-size:13.5px;line-height:1.6;font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;margin:16px 0;}
+  main code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;}
+  main p code,main li code{background:#eef1f5;color:#c2410c;padding:2px 6px;border-radius:5px;font-size:.9em;}
+
+  /* ---------- ECharts 图表 ---------- */
+  .chart-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;margin:18px 0;height:400px;position:relative;}
+  .chart-error{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:14px 16px;border-radius:10px;font-size:13.5px;white-space:pre-wrap;margin:16px 0;}
+
+  /* ---------- 提示气泡 ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);
+    background:#111827;color:#fff;padding:11px 20px;border-radius:10px;
+    font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:200;max-width:80vw;
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+  #toast.error{background:#b91c1c;}
+
+  footer{text-align:center;color:var(--muted);font-size:12.5px;padding:0 20px 30px;}
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width:920px){
+    header .btn.ghost{display:inline-block;}
+    .hint{display:none;}
+    header h1,header .sub{max-width:200px;}
+    nav#toc{
+      position:fixed;top:0;left:0;bottom:0;width:280px;max-height:none;
+      background:var(--card);box-shadow:0 0 40px rgba(0,0,0,.2);
+      z-index:90;padding-top:76px;transform:translateX(-105%);transition:transform .25s ease;
+    }
+    body.toc-open nav#toc{transform:translateX(0);}
+    body.toc-open::after{content:"";position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:80;}
+    main#content{margin:12px;padding:22px 18px 40px;}
+    main h1{font-size:24px;}
+    main h2{font-size:20px;}
+    .chart-box{height:320px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">M↓</div>
+    <div>
+      <h1 id="docTitle">Markdown 阅读器</h1>
+      <div class="sub" id="docSub">支持 ECharts 图表 · 可导出 PDF / 图片 / Word</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <span class="hint">图表依赖 ECharts · 需联网</span>
+  <button class="btn ghost" id="tocToggle" type="button">目录</button>
+  <div class="dropdown" id="exportDropdown">
+    <button class="btn" id="exportBtn" type="button" disabled>导出 ▾</button>
+    <div class="menu">
+      <div class="label">导出为…</div>
+      <button data-act="pdf" type="button">PDF 文档（含图表）</button>
+      <button data-act="png" type="button">图片 PNG（含图表）</button>
+      <button data-act="word" type="button">Word 文档（.doc）</button>
+    </div>
+  </div>
+  <button class="btn primary" id="openBtn" type="button">打开 .md 文件</button>
+</header>
+
+<div class="layout">
+  <nav id="toc" aria-label="目录">
+    <p class="toc-title">目录</p>
+    <ul id="tocList"></ul>
+  </nav>
+  <main id="content">
+    <div class="empty-state" data-open-file>
+      <div class="empty-icon">📄</div>
+      <h2>Markdown · ECharts 阅读器</h2>
+      <p>点击此处，或把 <code>.md</code> 文件拖到窗口任意位置即可开始阅读</p>
+      <p class="empty-sub">自动把 <code>```echarts</code> 代码块渲染为交互式图表，并支持导出 PDF / 图片 / Word</p>
+      <button class="btn primary big" data-open-file type="button">选择 .md 文件</button>
+    </div>
+  </main>
+</div>
+
+<input type="file" id="fileInput" accept=".md,.markdown,text/markdown,text/plain" hidden>
+<div id="toast" role="status"></div>
+<footer>
+  通用式 Markdown 阅读器 · 支持拖放或选择 <code>.md</code> 文件 · 若通过本地服务器（如 <code>python -m http.server</code>）访问，可用 <code>?file=xxx.md</code> 自动载入。
+</footer>
+
+<!-- ============ JS 库（CDN） ============ -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  var contentEl = document.getElementById("content");
+  var tocListEl = document.getElementById("tocList");
+  var charts = [];
+  var chartsById = {};
+  var chartSeq = 0;
+  var loaded = false;
+  var busy = false;
+  var currentTitle = "Markdown 阅读器";
+  var currentBaseName = "文档";
+  var activeObserver = null;
+
+  /* ---------- 工具 ---------- */
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function toast(msg, isError) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.toggle("error", !!isError);
+    t.classList.add("show");
+    clearTimeout(t._t);
+    t._t = setTimeout(function () { t.classList.remove("show"); }, 3200);
+  }
+  function triggerDownload(url, filename) {
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  function disposeCharts() {
+    charts.forEach(function (c) { try { c.dispose(); } catch (e) {} });
+    charts = [];
+    chartsById = {};
+  }
+  function slugify(text) {
+    var s = text.trim().toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, "-");
+    return s.replace(/^-+|-+$/g, "") || ("sec-" + Math.random().toString(36).slice(2));
+  }
+  function setBusy(b) {
+    busy = b;
+    var btn = document.getElementById("exportBtn");
+    btn.disabled = b || !loaded;
+    document.querySelectorAll("#exportDropdown .menu button").forEach(function (m) {
+      m.disabled = b || !loaded;
+    });
+    document.body.style.cursor = b ? "progress" : "";
+  }
+
+  /* ---------- 目录 ---------- */
+  function buildToc(root) {
+    var heads = root.querySelectorAll("h2, h3");
+    tocListEl.innerHTML = "";
+    if (!heads.length) { tocListEl.innerHTML = '<li style="color:#9aa3af;padding:6px 10px;">无目录</li>'; return; }
+    heads.forEach(function (h) {
+      if (!h.id) h.id = slugify(h.textContent);
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = "#" + h.id;
+      a.textContent = h.textContent;
+      a.className = h.tagName.toLowerCase() === "h3" ? "lvl3" : "";
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        document.getElementById(h.id).scrollIntoView({ behavior: "smooth", block: "start" });
+        document.body.classList.remove("toc-open");
+        history.replaceState(null, "", "#" + h.id);
+      });
+      li.appendChild(a);
+      tocListEl.appendChild(li);
+    });
+    observeHeadings(root);
+  }
+  function observeHeadings(root) {
+    if (!("IntersectionObserver" in window)) return;
+    if (activeObserver) activeObserver.disconnect();
+    activeObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          tocListEl.querySelectorAll("a").forEach(function (a) {
+            a.classList.toggle("active", a.getAttribute("href") === "#" + entry.target.id);
+          });
+        }
+      });
+    }, { rootMargin: "-80px 0px -70% 0px" });
+    root.querySelectorAll("h2,h3").forEach(function (h) { activeObserver.observe(h); });
+  }
+
+  /* ---------- ECharts 渲染 ---------- */
+  function renderCharts(root) {
+    var blocks = root.querySelectorAll("pre code.language-echarts");
+    blocks.forEach(function (code) {
+      var pre = code.parentElement;
+      var jsonText = code.textContent.trim();
+      var holder = document.createElement("div");
+      holder.className = "chart-box";
+      holder.id = "echart-" + (chartSeq++);
+      pre.replaceWith(holder);
+
+      if (typeof echarts === "undefined") {
+        holder.outerHTML = '<pre>' + escapeHtml(jsonText) + '</pre>';
+        return;
+      }
+      var option;
+      try { option = JSON.parse(jsonText); }
+      catch (e) {
+        holder.outerHTML = '<div class="chart-error">ECharts 配置解析失败：' + escapeHtml(e.message) + '</div>';
+        return;
+      }
+      try {
+        var chart = echarts.init(holder);
+        chart.setOption(option);
+        charts.push(chart);
+        chartsById[holder.id] = chart;
+      } catch (e) {
+        holder.outerHTML = '<div class="chart-error">ECharts 渲染失败：' + escapeHtml(e.message) + '</div>';
+      }
+    });
+  }
+
+  /* ---------- 渲染 ---------- */
+  function render(mdText, docTitle, docSub) {
+    disposeCharts();
+    currentTitle = docTitle || "Markdown 阅读器";
+    document.getElementById("docTitle").textContent = currentTitle;
+    document.getElementById("docSub").textContent = docSub || "支持 ECharts 图表 · 可导出 PDF / 图片 / Word";
+    document.title = currentTitle + " · Markdown 阅读器";
+
+    if (typeof marked === "undefined") {
+      contentEl.innerHTML = '<div class="chart-error">无法加载 Markdown 解析库（marked），请检查网络连接后刷新页面。</div>';
+      loaded = false; setBusy(false);
+      return;
+    }
+    var html;
+    try { html = marked.parse(mdText || ""); }
+    catch (e) {
+      contentEl.innerHTML = '<div class="chart-error">Markdown 解析失败：' + escapeHtml(e.message) + '</div>';
+      loaded = false; setBusy(false);
+      return;
+    }
+    contentEl.innerHTML = html;
+    loaded = true;
+    buildToc(contentEl);
+    renderCharts(contentEl);
+    setBusy(false);
+  }
+
+  function showEmpty() {
+    disposeCharts();
+    loaded = false;
+    currentTitle = "Markdown 阅读器";
+    currentBaseName = "文档";
+    document.getElementById("docTitle").textContent = "Markdown 阅读器";
+    document.getElementById("docSub").textContent = "支持 ECharts 图表 · 可导出 PDF / 图片 / Word";
+    document.title = "Markdown 阅读器 · 支持 ECharts 与导出";
+    contentEl.innerHTML =
+      '<div class="empty-state" data-open-file>' +
+      '<div class="empty-icon">📄</div>' +
+      '<h2>Markdown · ECharts 阅读器</h2>' +
+      '<p>点击此处，或把 <code>.md</code> 文件拖到窗口任意位置即可开始阅读</p>' +
+      '<p class="empty-sub">自动把 <code>```echarts</code> 代码块渲染为交互式图表，并支持导出 PDF / 图片 / Word</p>' +
+      '<button class="btn primary big" data-open-file type="button">选择 .md 文件</button>' +
+      '</div>';
+    tocListEl.innerHTML = "";
+    setBusy(false);
+  }
+
+  /* ---------- 读取 md ---------- */
+  function readFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var name = file.name.replace(/\.(md|markdown)$/i, "");
+      currentBaseName = name || "文档";
+      render(String(reader.result), name, file.name);
+      toast("已载入：" + file.name);
+    };
+    reader.onerror = function () {
+      contentEl.innerHTML = '<div class="chart-error">文件读取失败，请重试。</div>';
+      toast("文件读取失败", true);
+    };
+    reader.readAsText(file, "utf-8");
+  }
+
+  async function fetchMd(url) {
+    try {
+      var res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var text = await res.text();
+      var name = decodeURIComponent(url.split("/").pop() || "文档").replace(/\.(md|markdown)$/i, "");
+      currentBaseName = name || "文档";
+      render(text, name, url);
+      toast("已载入：" + url);
+    } catch (e) {
+      toast("无法自动加载 " + url + "：" + e.message, true);
+    }
+  }
+
+  /* ---------- 导出：图表快照 ---------- */
+  function snapshotChartsIn(root) {
+    root.querySelectorAll(".chart-box").forEach(function (box) {
+      var chart = chartsById[box.id];
+      if (!chart) return;
+      var url = null;
+      try { url = chart.getDataURL({ pixelRatio: 2, backgroundColor: "#ffffff" }); } catch (e) {}
+      if (!url) return;
+      var live = chart.getDom();
+      var img = document.createElement("img");
+      img.src = url;
+      img.width = (live && live.offsetWidth) || 800;
+      img.height = (live && live.offsetHeight) || 400;
+      img.style.maxWidth = "100%";
+      img.style.height = "auto";
+      img.style.display = "block";
+      img.alt = "chart";
+      box.replaceWith(img);
+    });
+  }
+
+  function swapChartsWithImages(root) {
+    var boxes = Array.prototype.slice.call(root.querySelectorAll(".chart-box"));
+    var swaps = [];
+    boxes.forEach(function (box) {
+      var chart = chartsById[box.id];
+      if (!chart) return;
+      var url = null;
+      try { url = chart.getDataURL({ pixelRatio: 2, backgroundColor: "#ffffff" }); } catch (e) {}
+      if (!url) return;
+      var img = document.createElement("img");
+      img.src = url;
+      img.width = box.offsetWidth || 800;
+      img.height = box.offsetHeight || 400;
+      img.style.maxWidth = "100%";
+      img.style.height = "auto";
+      img.style.display = "block";
+      img.alt = "chart";
+      box.replaceWith(img);
+      swaps.push({ img: img, box: box });
+    });
+    return function restore() {
+      swaps.forEach(function (s) { s.img.replaceWith(s.box); });
+      charts.forEach(function (c) { try { c.resize(); } catch (e) {} });
+    };
+  }
+
+  async function captureContentCanvas() {
+    var restore = swapChartsWithImages(contentEl);
+    try {
+      return await html2canvas(contentEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        allowTaint: false
+      });
+    } finally {
+      restore();
+    }
+  }
+
+  /* ---------- 导出：PNG ---------- */
+  async function exportPNG() {
+    if (!loaded) { toast("请先载入 Markdown 文件"); return; }
+    setBusy(true);
+    toast("正在生成图片…");
+    try {
+      var canvas = await captureContentCanvas();
+      triggerDownload(canvas.toDataURL("image/png"), currentBaseName + ".png");
+      toast("图片已导出");
+    } catch (e) {
+      toast("导出失败：" + e.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* ---------- 导出：PDF ---------- */
+  async function exportPDF() {
+    if (!loaded) { toast("请先载入 Markdown 文件"); return; }
+    if (typeof jspdf === "undefined") { toast("PDF 库未加载，请联网后刷新", true); return; }
+    setBusy(true);
+    toast("正在生成 PDF…");
+    try {
+      var canvas = await captureContentCanvas();
+      var imgData = canvas.toDataURL("image/jpeg", 0.92);
+      var pdf = new jspdf.jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      var pageW = pdf.internal.pageSize.getWidth();
+      var pageH = pdf.internal.pageSize.getHeight();
+      var imgW = pageW;
+      var imgH = canvas.height * pageW / canvas.width;
+      var heightLeft = imgH;
+      var position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+      heightLeft -= pageH;
+      while (heightLeft > 0) {
+        position -= pageH;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, imgW, imgH);
+        heightLeft -= pageH;
+      }
+      pdf.setProperties({ title: currentTitle });
+      pdf.save(currentBaseName + ".pdf");
+      toast("PDF 已导出");
+    } catch (e) {
+      toast("导出失败：" + e.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* ---------- 导出：Word ---------- */
+  var WORD_CSS =
+    'body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;font-size:12pt;line-height:1.7;color:#1f2328;}' +
+    'h1{font-size:22pt;}h2{font-size:16pt;border-bottom:1px solid #ccc;padding-bottom:4pt;margin-top:18pt;}' +
+    'h3{font-size:13.5pt;}table{border-collapse:collapse;width:100%;margin:8pt 0;}' +
+    'th,td{border:1px solid #999;padding:4pt 8pt;font-size:10.5pt;vertical-align:top;}' +
+    'th{background:#f0f4fa;font-weight:bold;}' +
+    'img{max-width:100%;height:auto;}' +
+    'blockquote{border-left:4px solid #ccc;padding-left:10pt;color:#555;margin:8pt 0;}' +
+    'code{font-family:Consolas,monospace;background:#f2f2f2;padding:1pt 3pt;border-radius:2pt;}' +
+    'pre{background:#f5f5f5;padding:8pt;border:1px solid #ddd;white-space:pre-wrap;font-size:10pt;}' +
+    'hr{border:none;border-top:1px solid #ccc;margin:12pt 0;}li{margin:3pt 0;}';
+
+  function exportWord() {
+    if (!loaded) { toast("请先载入 Markdown 文件"); return; }
+    setBusy(true);
+    toast("正在生成 Word…");
+    try {
+      var clone = contentEl.cloneNode(true);
+      clone.id = "word-export";
+      snapshotChartsIn(clone);
+      var bodyHtml = clone.innerHTML;
+      var docHtml =
+        '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+        'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+        'xmlns="http://www.w3.org/TR/REC-html40">' +
+        '<head><meta charset="utf-8"><title>' + escapeHtml(currentTitle) + '</title>' +
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
+        '<style>' + WORD_CSS + '</style></head>' +
+        '<body>' + bodyHtml + '</body></html>';
+      var blob = new Blob(["\ufeff", docHtml], { type: "application/msword" });
+      triggerDownload(URL.createObjectURL(blob), currentBaseName + ".doc");
+      toast("Word 已导出");
+    } catch (e) {
+      toast("导出失败：" + e.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /* ---------- 事件 ---------- */
+  document.getElementById("openBtn").addEventListener("click", function () {
+    document.getElementById("fileInput").click();
+  });
+  document.getElementById("fileInput").addEventListener("change", function () {
+    readFile(this.files && this.files[0]);
+    this.value = "";
+  });
+
+  document.addEventListener("click", function (ev) {
+    var openTarget = ev.target.closest("[data-open-file]");
+    if (openTarget) { document.getElementById("fileInput").click(); return; }
+    var dd = document.getElementById("exportDropdown");
+    if (!ev.target.closest("#exportDropdown")) dd.classList.remove("open");
+  });
+
+  var exportBtn = document.getElementById("exportBtn");
+  exportBtn.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    if (busy || !loaded) return;
+    document.getElementById("exportDropdown").classList.toggle("open");
+  });
+  document.querySelectorAll("#exportDropdown .menu button").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.getElementById("exportDropdown").classList.remove("open");
+      var act = btn.getAttribute("data-act");
+      if (act === "pdf") exportPDF();
+      else if (act === "png") exportPNG();
+      else if (act === "word") exportWord();
+    });
+  });
+
+  document.getElementById("tocToggle").addEventListener("click", function () {
+    document.body.classList.toggle("toc-open");
+  });
+
+  /* 拖拽载入 */
+  window.addEventListener("dragenter", function (e) { e.preventDefault(); document.body.classList.add("dragging"); });
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
+  window.addEventListener("dragleave", function (e) {
+    if (e.relatedTarget === null) document.body.classList.remove("dragging");
+  });
+  window.addEventListener("drop", function (e) {
+    e.preventDefault();
+    document.body.classList.remove("dragging");
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) readFile(f);
+  });
+
+  /* 图表自适应 */
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      charts.forEach(function (c) { try { c.resize(); } catch (e) {} });
+    }, 150);
+  });
+
+  /* 初始：优先按 ?file= 参数自动载入（需 http 服务环境） */
+  var params = new URLSearchParams(location.search);
+  var fileParam = params.get("file");
+  if (fileParam) {
+    showEmpty();
+    fetchMd(fileParam);
+  } else {
+    showEmpty();
+  }
+})();
+</script>
+</body>
+</html>
