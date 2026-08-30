@@ -2,7 +2,7 @@
   "name": "md-echarts-preview",
   "displayName": "Markdown + ECharts Preview",
   "description": "Markdown 实时预览自定义编辑器：渲染 ```echarts 图表、KaTeX 公式、Mermaid 图、SVG 图片，支持滚动同步与导出 PDF / 图片 / HTML / Word。",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "gorilla-kevv",
   "license": "MIT",
   "repository": {

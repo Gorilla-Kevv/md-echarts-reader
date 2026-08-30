@@ -59,15 +59,25 @@ function activate(context) {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('mdEchartsPreview')) {
-        previewSessions.forEach((s) => s.refresh());
+        previewSessions.forEach((s) => { try { s.refresh(); } catch (err) {} });
       }
     })
   );
 }
 
 function deactivate() {
+  if (panelTimer) clearTimeout(panelTimer);
   panel = undefined;
   panelDocUri = undefined;
+}
+
+/* ---------- 工具 ---------- */
+function safePostMessage(webview, msg) {
+  try {
+    webview.postMessage(msg);
+  } catch (e) {
+    // webview 已被销毁时静默忽略，避免抛 "Webview is disposed"
+  }
 }
 
 /* ---------- 设置 ---------- */
@@ -117,18 +127,23 @@ function openPanel(context) {
     panel.webview.html = getWebviewHtml(panel.webview, context.extensionUri);
     panel.onDidDispose(() => {
       removeSession(panel.webview);
+      if (panelTimer) clearTimeout(panelTimer);
       panel = undefined;
       panelDocUri = undefined;
     }, null, context.subscriptions);
     panel.webview.onDidReceiveMessage(
-      (msg) => onWebviewMessage(msg, panelDocUri),
+      (msg) => onWebviewMessage(msg, panel.webview, panelDocUri),
       undefined,
       context.subscriptions
     );
     addSession({
       webview: panel.webview,
       docUri: doc.uri.toString(),
-      refresh: () => pushDoc(panel.webview, doc)
+      refresh: () => {
+        const ed = vscode.window.activeTextEditor;
+        if (ed && ed.document.languageId === 'markdown') pushDoc(panel.webview, ed.document);
+        else if (panel) pushDoc(panel.webview, doc);
+      }
     });
   }
 
@@ -138,7 +153,7 @@ function openPanel(context) {
 function pushDoc(webview, doc) {
   const name = path.basename(doc.fileName || '未命名');
   if (panel && webview === panel.webview) panel.title = '预览: ' + name;
-  webview.postMessage({
+  safePostMessage(webview, {
     type: 'update',
     markdown: doc.getText(),
     title: name,
@@ -161,10 +176,12 @@ class MarkdownEchartsEditorProvider {
     webviewPanel.webview.html = getWebviewHtml(webviewPanel.webview, this.context.extensionUri);
 
     let timer = undefined;
+    let disposed = false;
     const refresh = () => {
+      if (disposed) return;
       const name = path.basename(document.fileName || '未命名');
       webviewPanel.title = name;
-      webviewPanel.webview.postMessage({
+      safePostMessage(webviewPanel.webview, {
         type: 'update',
         markdown: document.getText(),
         title: name,
@@ -175,21 +192,22 @@ class MarkdownEchartsEditorProvider {
     refresh();
 
     const changeSub = vscode.workspace.onDidChangeTextDocument((e) => {
-      if (e.document.uri.toString() !== document.uri.toString()) return;
+      if (disposed || e.document.uri.toString() !== document.uri.toString()) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(refresh, 150);
     });
 
     const visibleSub = vscode.window.onDidChangeTextEditorVisibleRanges((e) => {
-      if (e.textEditor.document.uri.toString() !== document.uri.toString()) return;
+      if (disposed || e.textEditor.document.uri.toString() !== document.uri.toString()) return;
       postScroll(webviewPanel.webview, e.visibleRanges);
     });
 
-    webviewPanel.webview.onDidReceiveMessage((msg) => onWebviewMessage(msg, document.uri.toString()));
+    webviewPanel.webview.onDidReceiveMessage((msg) => onWebviewMessage(msg, webviewPanel.webview, document.uri.toString()));
 
     addSession({ webview: webviewPanel.webview, docUri: document.uri.toString(), refresh });
 
     webviewPanel.onDidDispose(() => {
+      disposed = true;
       removeSession(webviewPanel.webview);
       changeSub.dispose();
       visibleSub.dispose();
@@ -199,18 +217,22 @@ class MarkdownEchartsEditorProvider {
 }
 
 /* ---------- webview 消息 ---------- */
-async function onWebviewMessage(msg, uriStr) {
+async function onWebviewMessage(msg, webview, uriStr) {
   if (!msg) return;
   if (msg.type === 'export') {
     await handleExport(msg);
   } else if (msg.type === 'scroll' && typeof msg.line === 'number') {
     revealLineByUri(uriStr, msg.line);
+  } else if (msg.type === 'ready') {
+    // 首次渲染握手：webview 脚本就绪后重推一次内容，避免首条 update 丢失
+    const session = previewSessions.find((s) => s.webview === webview);
+    if (session) { try { session.refresh(); } catch (e) {} }
   }
 }
 
 function postScroll(webview, visibleRanges) {
   const line = visibleRanges && visibleRanges.length ? visibleRanges[0].start.line : 0;
-  webview.postMessage({ type: 'scroll', line });
+  safePostMessage(webview, { type: 'scroll', line });
 }
 
 function revealLineByUri(uriStr, line) {

@@ -1,6 +1,10 @@
 (function () {
   "use strict";
   var vscode = acquireVsCodeApi();
+  var _vscodeApi = vscode;
+  function post(msg) {
+    try { _vscodeApi.postMessage(msg); } catch (e) { /* webview 已销毁，静默忽略 */ }
+  }
 
   var contentEl = document.getElementById("content");
   var tocListEl = document.getElementById("tocList");
@@ -397,7 +401,7 @@
     toast("正在生成图片…");
     try {
       var canvas = await captureContentCanvas();
-      vscode.postMessage({ type: "export", format: "png", dataUrl: canvas.toDataURL("image/png"), filename: currentBaseName });
+      post({ type: "export", format: "png", dataUrl: canvas.toDataURL("image/png"), filename: currentBaseName });
       toast("已生成，请选择保存位置");
     } catch (e) { toast("导出失败：" + e.message, true); }
     finally { setBusy(false); }
@@ -427,7 +431,7 @@
         heightLeft -= pageH;
       }
       pdf.setProperties({ title: currentTitle });
-      vscode.postMessage({ type: "export", format: "pdf", dataUrl: pdf.output("datauristring"), filename: currentBaseName });
+      post({ type: "export", format: "pdf", dataUrl: pdf.output("datauristring"), filename: currentBaseName });
       toast("已生成，请选择保存位置");
     } catch (e) { toast("导出失败：" + e.message, true); }
     finally { setBusy(false); }
@@ -463,7 +467,7 @@
         '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
         '<style>' + WORD_CSS + '</style></head>' +
         '<body>' + bodyHtml + '</body></html>';
-      vscode.postMessage({ type: "export", format: "word", text: docHtml, filename: currentBaseName });
+      post({ type: "export", format: "word", text: docHtml, filename: currentBaseName });
       toast("已生成，请选择保存位置");
     } catch (e) { toast("导出失败：" + e.message, true); }
     finally { setBusy(false); }
@@ -481,7 +485,7 @@
       var html =
         '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><title>' + escapeHtml(currentTitle) + '</title>' +
         '<style>' + getEmbeddedStyle() + '</style></head><body><main class="export">' + clone.innerHTML + '</main></body></html>';
-      vscode.postMessage({ type: "export", format: "html", text: html, filename: currentBaseName });
+      post({ type: "export", format: "html", text: html, filename: currentBaseName });
       toast("已生成，请选择保存位置");
     } catch (e) { toast("导出失败：" + e.message, true); }
     finally { setBusy(false); }
@@ -513,7 +517,7 @@
       } else { break; }
     }
     if (topLine !== null && topLine !== undefined) {
-      vscode.postMessage({ type: "scroll", line: parseInt(topLine, 10) });
+      post({ type: "scroll", line: parseInt(topLine, 10) });
     }
   }
   function scrollToLine(line) {
@@ -577,5 +581,5 @@
     }, 150);
   });
 
-  vscode.postMessage({ type: "ready" });
+  post({ type: "ready" });
 })();

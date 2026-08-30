@@ -1,5 +1,10 @@
 # 更新日志
 
+## 0.2.1
+
+- 修复预览时偶发 `Webview is disposed` 报错：所有 postMessage 增加销毁保护、清理防抖定时器、新增 ready 握手重推内容
+- 修复 webview 首次加载时首条内容可能丢失的问题
+
 ## 0.2.0
 
 - 新增自定义编辑器（右键 `.md` → 打开方式 → Markdown + ECharts 预览）
