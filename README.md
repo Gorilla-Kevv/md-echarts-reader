@@ -23,6 +23,18 @@ A single-file, zero-build Markdown reader that turns `echarts` fenced code block
 
 > ⚠️ **需联网**：`marked`、`ECharts`、`html2canvas`、`jsPDF` 均通过 jsDelivr CDN 加载。离线时正文可阅读，图表渲染与导出功能不可用。
 
+## 📦 单文件「快速查看」版
+
+想**双击一个文件就直接打开某篇文档**（无需选文件、无需命令行），把 Markdown 原文内嵌进阅读器即可：复制 `Markdown阅读器.html`，在主脚本之前加入
+
+```html
+<script type="text/markdown" id="md-source" data-title="文档标题" data-sub="副标题">
+…此处粘贴 Markdown 原文（图片请用 data: URI 或相对路径）…
+</script>
+```
+
+打开后会自动渲染该内容，且仍支持右上角导出。
+
 ## 📝 在 Markdown 中写图表
 
 在 `.md` 里写一个 `echarts` 语言的围栏代码块，内容为 [ECharts option](https://echarts.apache.org/zh/option.html) JSON：

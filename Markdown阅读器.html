@@ -135,6 +135,7 @@
   main hr{border:none;border-top:1px solid var(--border);margin:32px 0;}
   main blockquote{margin:16px 0;padding:12px 18px;background:#f6f8fb;border-left:4px solid var(--accent);border-radius:0 8px 8px 0;color:#374151;}
   main blockquote p{margin:4px 0;}
+  main img{max-width:100%;height:auto;border-radius:6px;margin:12px 0;}
 
   main table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14.5px;border:1px solid var(--border);border-radius:10px;overflow:hidden;display:block;overflow-x:auto;white-space:nowrap;}
   main th,main td{padding:10px 14px;border:1px solid var(--border);text-align:left;vertical-align:top;}
@@ -663,14 +664,23 @@
     }, 150);
   });
 
-  /* 初始：优先按 ?file= 参数自动载入（需 http 服务环境） */
-  var params = new URLSearchParams(location.search);
-  var fileParam = params.get("file");
-  if (fileParam) {
-    showEmpty();
-    fetchMd(fileParam);
+  /* 初始：优先内嵌内容；否则按 ?file= 参数自动载入（需 http 服务环境） */
+  var embedded = document.getElementById("md-source");
+  if (embedded && embedded.textContent.trim()) {
+    render(
+      embedded.textContent.trim(),
+      embedded.getAttribute("data-title") || "文档",
+      embedded.getAttribute("data-sub") || "支持 ECharts 图表 · 可导出 PDF / 图片 / Word"
+    );
   } else {
-    showEmpty();
+    var params = new URLSearchParams(location.search);
+    var fileParam = params.get("file");
+    if (fileParam) {
+      showEmpty();
+      fetchMd(fileParam);
+    } else {
+      showEmpty();
+    }
   }
 })();
 </script>
