@@ -494,8 +494,80 @@
     };
   }
 
+  /* ---------- 导出：SVG 图片光栅化（html2canvas 对 SVG 的 <img> 支持不稳定，先转成 PNG） ---------- */
+  function parseViewBox(src) {
+    if (!/^data:image\/svg\+xml/i.test(src)) return null;
+    try {
+      var b64 = src.split(",").slice(1).join(",");
+      var xml = atob(b64.replace(/\s+/g, ""));
+      var m = xml.match(/viewBox\s*=\s*["']\s*([\d.\-\s,]+)["']/);
+      if (m) {
+        var parts = m[1].trim().split(/[\s,]+/).map(Number);
+        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) return { w: parts[2], h: parts[3] };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function svgToPng(src) {
+    return new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(function () { if (!settled) { settled = true; resolve(null); } }, 5000);
+      var img = new Image();
+      img.onload = function () {
+        if (settled) return;
+        clearTimeout(timer);
+        try {
+          var w = img.naturalWidth || 0;
+          var h = img.naturalHeight || 0;
+          if (!w || !h) {
+            var vb = parseViewBox(src);
+            if (vb) { w = vb.w; h = vb.h; }
+          }
+          if (!w || !h) { w = 800; h = 600; }
+          var canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          settled = true;
+          resolve(canvas.toDataURL("image/png"));
+        } catch (e) {
+          settled = true;
+          resolve(null);
+        }
+      };
+      img.onerror = function () {
+        if (settled) return;
+        clearTimeout(timer);
+        settled = true;
+        resolve(null);
+      };
+      img.src = src;
+    });
+  }
+
+  async function rasterizeSvgImages(root) {
+    var imgs = Array.prototype.slice.call(root.querySelectorAll("img"));
+    var swaps = [];
+    for (var i = 0; i < imgs.length; i++) {
+      var img = imgs[i];
+      var src = img.getAttribute("src") || "";
+      if (!/^data:image\/svg\+xml/i.test(src) && !/\.svg(\?.*)?$/i.test(src)) continue;
+      var png = await svgToPng(src);
+      if (!png) continue;
+      var prev = img.getAttribute("src");
+      img.setAttribute("src", png);
+      swaps.push({ img: img, prev: prev });
+    }
+    return function restore() {
+      swaps.forEach(function (s) { s.img.setAttribute("src", s.prev); });
+    };
+  }
+
   async function captureContentCanvas() {
     var restore = swapChartsWithImages(contentEl);
+    var restoreSvg = await rasterizeSvgImages(contentEl);
     try {
       var canvas = await html2canvas(contentEl, {
         scale: 2,
@@ -512,6 +584,7 @@
       }
       return canvas;
     } finally {
+      restoreSvg();
       restore();
     }
   }
@@ -579,7 +652,7 @@
     'pre{background:#f5f5f5;padding:8pt;border:1px solid #ddd;white-space:pre-wrap;font-size:10pt;}' +
     'hr{border:none;border-top:1px solid #ccc;margin:12pt 0;}li{margin:3pt 0;}';
 
-  function exportWord() {
+  async function exportWord() {
     if (!loaded) { toast("请先载入 Markdown 文件"); return; }
     setBusy(true);
     toast("正在生成 Word…");
@@ -587,6 +660,7 @@
       var clone = contentEl.cloneNode(true);
       clone.id = "word-export";
       snapshotChartsIn(clone);
+      await rasterizeSvgImages(clone);
       var bodyHtml = clone.innerHTML;
       var docHtml =
         '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
