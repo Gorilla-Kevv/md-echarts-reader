@@ -5,6 +5,7 @@ let panel = undefined;
 let panelTimer = undefined;
 let panelDocUri = undefined;
 const previewSessions = []; // { webview, docUri, refresh }
+let selfUpdating = false;
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -13,6 +14,11 @@ function activate(context) {
   // 1) 命令式「侧边预览」
   context.subscriptions.push(
     vscode.commands.registerCommand('mdEchartsPreview.open', () => openPanel(context))
+  );
+
+  // 1b) 设为/取消 .md 默认编辑器
+  context.subscriptions.push(
+    vscode.commands.registerCommand('mdEchartsPreview.toggleDefaultEditor', toggleDefaultEditor)
   );
 
   // 2) 自定义编辑器（对齐 MPE 形态：右键 → 打开方式 → Markdown + ECharts 预览）
@@ -55,9 +61,10 @@ function activate(context) {
     })
   );
 
-  // 6) 设置变更 → 刷新所有预览
+  // 6) 设置变更 → 刷新所有预览（自身写入的设置跳过，避免重渲染）
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
+      if (selfUpdating) return;
       if (e.affectsConfiguration('mdEchartsPreview')) {
         previewSessions.forEach((s) => { try { s.refresh(); } catch (err) {} });
       }
@@ -87,8 +94,37 @@ function readSettings() {
     scrollSync: c.get('scrollSync', true),
     sectionNumbering: c.get('sectionNumbering', false),
     math: c.get('math', true),
-    mermaid: c.get('mermaid', true)
+    mermaid: c.get('mermaid', true),
+    toc: c.get('toc', true),
+    tocWidth: c.get('tocWidth', 230)
   };
+}
+
+/* ---------- 设置写入（webview 交互时，避免触发自身刷新） ---------- */
+async function updateConfig(key, value) {
+  selfUpdating = true;
+  try {
+    await vscode.workspace.getConfiguration('mdEchartsPreview').update(key, value, vscode.ConfigurationTarget.Global);
+  } finally {
+    selfUpdating = false;
+  }
+}
+
+/* ---------- 默认编辑器开关 ---------- */
+async function toggleDefaultEditor() {
+  const globs = ['*.md', '*.markdown', '*.mdown', '*.mkd', '*.mkdn'];
+  const cfg = vscode.workspace.getConfiguration('workbench');
+  const assoc = Object.assign({}, cfg.get('editorAssociations') || {});
+  const isDefault = globs.some((g) => assoc[g] === 'mdEchartsPreview.editor');
+  if (isDefault) {
+    globs.forEach((g) => { if (assoc[g] === 'mdEchartsPreview.editor') delete assoc[g]; });
+    await cfg.update('editorAssociations', assoc, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage('已取消默认编辑器：重新打开 .md 将使用文本编辑器。');
+  } else {
+    globs.forEach((g) => { assoc[g] = 'mdEchartsPreview.editor'; });
+    await cfg.update('editorAssociations', assoc, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage('已设为默认编辑器：重新打开 .md 将直接进入预览（只读）。编辑请右键 → 打开方式 → 文本编辑器。');
+  }
 }
 
 /* ---------- 会话注册（用于设置变更时刷新） ---------- */
@@ -227,6 +263,10 @@ async function onWebviewMessage(msg, webview, uriStr) {
     // 首次渲染握手：webview 脚本就绪后重推一次内容，避免首条 update 丢失
     const session = previewSessions.find((s) => s.webview === webview);
     if (session) { try { session.refresh(); } catch (e) {} }
+  } else if (msg.type === 'tocToggle' && typeof msg.visible === 'boolean') {
+    updateConfig('toc', msg.visible);
+  } else if (msg.type === 'tocWidth' && typeof msg.width === 'number') {
+    updateConfig('tocWidth', Math.round(msg.width));
   }
 }
 
@@ -309,7 +349,7 @@ function getWebviewHtml(webview, extensionUri) {
     </div>
   </div>
   <div class="spacer"></div>
-  <button class="btn ghost" id="tocToggle" type="button">目录</button>
+  <button class="btn" id="tocToggle" type="button">目录</button>
   <div class="dropdown" id="exportDropdown">
     <button class="btn" id="exportBtn" type="button">导出 ▾</button>
     <div class="menu">
@@ -323,6 +363,7 @@ function getWebviewHtml(webview, extensionUri) {
 </header>
 <div class="layout">
   <nav id="toc"><p class="toc-title">目录</p><ul id="tocList"></ul></nav>
+  <div id="tocResizer" title="拖动调整目录宽度"></div>
   <main id="content"><div class="empty">正在等待 Markdown 内容…</div></main>
 </div>
 <div id="toast" role="status"></div>

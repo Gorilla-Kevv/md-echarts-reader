@@ -1,8 +1,8 @@
 {
   "name": "md-echarts-preview",
   "displayName": "Markdown + ECharts Preview",
-  "description": "Markdown 实时预览自定义编辑器：渲染 ```echarts 图表、KaTeX 公式、Mermaid 图、SVG 图片，支持滚动同步与导出 PDF / 图片 / HTML / Word。",
-  "version": "0.2.1",
+  "description": "Markdown 实时预览自定义编辑器：渲染 ```echarts 图表、KaTeX 公式、Mermaid 图、SVG 图片，支持滚动同步、可调节目录导航栏，导出 PDF / 图片 / HTML / Word。",
+  "version": "0.3.0",
   "publisher": "gorilla-kevv",
   "license": "MIT",
   "repository": {
@@ -39,6 +39,11 @@
         "command": "mdEchartsPreview.open",
         "title": "Markdown+ECharts: 打开侧边预览",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "mdEchartsPreview.toggleDefaultEditor",
+        "title": "Markdown+ECharts: 设为/取消 .md 默认编辑器",
+        "icon": "$(edit)"
       }
     ],
     "customEditors": [
@@ -65,6 +70,9 @@
         {
           "command": "mdEchartsPreview.open",
           "when": "resourceLangId == markdown"
+        },
+        {
+          "command": "mdEchartsPreview.toggleDefaultEditor"
         }
       ]
     },
@@ -98,6 +106,18 @@
           "type": "boolean",
           "default": true,
           "description": "渲染 ```mermaid 代码块为图表。"
+        },
+        "mdEchartsPreview.toc": {
+          "type": "boolean",
+          "default": true,
+          "description": "显示目录导航栏（可在预览右上角「目录」按钮切换）。"
+        },
+        "mdEchartsPreview.tocWidth": {
+          "type": "number",
+          "default": 230,
+          "minimum": 160,
+          "maximum": 480,
+          "description": "目录导航栏宽度（像素），也可在预览中拖动分隔条调整。"
         }
       }
     }

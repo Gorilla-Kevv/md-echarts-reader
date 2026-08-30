@@ -1,5 +1,11 @@
 # 更新日志
 
+## 0.3.0
+
+- 新增「设为/取消 .md 默认编辑器」命令（写入 `workbench.editorAssociations`）
+- 目录导航栏可显示/隐藏（右上角「目录」按钮），可拖动分隔条或通过设置 `tocWidth` 调整宽度
+- 新增设置项：toc / tocWidth
+
 ## 0.2.1
 
 - 修复预览时偶发 `Webview is disposed` 报错：所有 postMessage 增加销毁保护、清理防抖定时器、新增 ready 握手重推内容

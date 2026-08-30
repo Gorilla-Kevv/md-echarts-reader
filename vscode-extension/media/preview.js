@@ -18,7 +18,7 @@
   var activeObserver = null;
   var suppressReportUntil = 0;
 
-  var settings = { scrollSync: true, sectionNumbering: false, math: true, mermaid: true };
+  var settings = { scrollSync: true, sectionNumbering: false, math: true, mermaid: true, toc: true, tocWidth: 230 };
 
   /* ---------- 工具 ---------- */
   function escapeHtml(s) {
@@ -225,6 +225,8 @@
   async function render(mdText, title, sub, s) {
     disposeCharts();
     settings = s || settings;
+    document.body.classList.toggle("toc-hidden", !settings.toc);
+    document.documentElement.style.setProperty("--toc-width", (settings.tocWidth || 230) + "px");
     currentTitle = title || "文档";
     currentBaseName = (title || "文档").replace(/\.(md|markdown)$/i, "");
     document.getElementById("docTitle").textContent = currentTitle;
@@ -564,8 +566,37 @@
     if (!ev.target.closest("#exportDropdown")) document.getElementById("exportDropdown").classList.remove("open");
   });
   document.getElementById("tocToggle").addEventListener("click", function () {
-    document.body.classList.toggle("toc-open");
+    if (window.matchMedia("(max-width: 820px)").matches) {
+      document.body.classList.toggle("toc-open");
+    } else {
+      var hidden = document.body.classList.toggle("toc-hidden");
+      post({ type: "tocToggle", visible: !hidden });
+    }
   });
+
+  // 拖动调整目录宽度
+  var resizer = document.getElementById("tocResizer");
+  if (resizer) {
+    resizer.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      resizer.classList.add("active");
+      var startX = e.clientX;
+      var startW = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--toc-width")) || 230;
+      function onMove(ev) {
+        var w = Math.min(480, Math.max(160, startW + (ev.clientX - startX)));
+        document.documentElement.style.setProperty("--toc-width", w + "px");
+      }
+      function onUp() {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        resizer.classList.remove("active");
+        var w = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--toc-width")) || 230;
+        post({ type: "tocWidth", width: w });
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+  }
 
   var scrollTimer = null;
   window.addEventListener("scroll", function () {
