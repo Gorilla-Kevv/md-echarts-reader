@@ -51,6 +51,8 @@ A single-file, zero-build Markdown reader that turns `echarts` fenced code block
 
 导出时会把每个 ECharts 图表用 `chart.getDataURL()` 转成图片后再生成，避免截图失真，导出完成后自动恢复交互图表。
 
+> ⚠️ 若文档引用了**远程图片**且该服务器未开放 CORS，浏览器会判定画布被「污染」而拒绝导出。此时请改用本地服务器（`python -m http.server`）访问，或使用支持跨域的图床。
+
 ## 🌐 通过本地服务器使用 `?file=`
 
 双击打开（`file://` 协议）时浏览器禁止本地 `fetch`，因此 `?file=` 参数需要在 HTTP 环境下使用：

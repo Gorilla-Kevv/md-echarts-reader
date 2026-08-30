@@ -436,48 +436,59 @@
   }
 
   /* ---------- 导出：图表快照 ---------- */
+  function chartToImage(chart, width, height) {
+    var url = null;
+    try { url = chart.getDataURL({ pixelRatio: 2, backgroundColor: "#ffffff" }); }
+    catch (e) { url = null; }
+    if (!url) {
+      // getDataURL 失败通常是 canvas 被跨域图片污染，尝试直接读底层 canvas
+      var dom = chart.getDom();
+      var cv = dom && dom.querySelector("canvas");
+      if (cv) { try { url = cv.toDataURL("image/png"); } catch (e2) { url = null; } }
+    }
+    if (!url) return null;
+    var img = document.createElement("img");
+    img.src = url;
+    img.width = width || 800;
+    img.height = height || 400;
+    img.style.maxWidth = "100%";
+    img.style.height = "auto";
+    img.style.display = "block";
+    img.alt = "chart";
+    return img;
+  }
+
+  function chartPlaceholder() {
+    var ph = document.createElement("div");
+    ph.className = "chart-error";
+    ph.textContent = "（该图表被浏览器判定为受污染画布，无法导出，已省略；如含远程图片请改用本地服务器访问）";
+    return ph;
+  }
+
+  function swapChartBox(box, liveSize) {
+    var chart = chartsById[box.id];
+    if (!chart) return null;
+    var live = chart.getDom();
+    var w = (liveSize && live && live.offsetWidth) || box.offsetWidth || 800;
+    var h = (liveSize && live && live.offsetHeight) || box.offsetHeight || 400;
+    var replacement = chartToImage(chart, w, h) || chartPlaceholder();
+    box.replaceWith(replacement);
+    return { el: replacement, box: box };
+  }
+
   function snapshotChartsIn(root) {
-    root.querySelectorAll(".chart-box").forEach(function (box) {
-      var chart = chartsById[box.id];
-      if (!chart) return;
-      var url = null;
-      try { url = chart.getDataURL({ pixelRatio: 2, backgroundColor: "#ffffff" }); } catch (e) {}
-      if (!url) return;
-      var live = chart.getDom();
-      var img = document.createElement("img");
-      img.src = url;
-      img.width = (live && live.offsetWidth) || 800;
-      img.height = (live && live.offsetHeight) || 400;
-      img.style.maxWidth = "100%";
-      img.style.height = "auto";
-      img.style.display = "block";
-      img.alt = "chart";
-      box.replaceWith(img);
-    });
+    root.querySelectorAll(".chart-box").forEach(function (box) { swapChartBox(box, true); });
   }
 
   function swapChartsWithImages(root) {
     var boxes = Array.prototype.slice.call(root.querySelectorAll(".chart-box"));
     var swaps = [];
     boxes.forEach(function (box) {
-      var chart = chartsById[box.id];
-      if (!chart) return;
-      var url = null;
-      try { url = chart.getDataURL({ pixelRatio: 2, backgroundColor: "#ffffff" }); } catch (e) {}
-      if (!url) return;
-      var img = document.createElement("img");
-      img.src = url;
-      img.width = box.offsetWidth || 800;
-      img.height = box.offsetHeight || 400;
-      img.style.maxWidth = "100%";
-      img.style.height = "auto";
-      img.style.display = "block";
-      img.alt = "chart";
-      box.replaceWith(img);
-      swaps.push({ img: img, box: box });
+      var r = swapChartBox(box, false);
+      if (r) swaps.push(r);
     });
     return function restore() {
-      swaps.forEach(function (s) { s.img.replaceWith(s.box); });
+      swaps.forEach(function (s) { s.el.replaceWith(s.box); });
       charts.forEach(function (c) { try { c.resize(); } catch (e) {} });
     };
   }
@@ -485,13 +496,20 @@
   async function captureContentCanvas() {
     var restore = swapChartsWithImages(contentEl);
     try {
-      return await html2canvas(contentEl, {
+      var canvas = await html2canvas(contentEl, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
         logging: false,
-        allowTaint: false
+        allowTaint: false,
+        imageTimeout: 15000
       });
+      // 兜底：若仍被污染，抛出更友好的提示
+      try { canvas.toDataURL("image/png"); }
+      catch (e) {
+        throw new Error("截图被浏览器判定为受污染（多因跨域图片）。若文档含远程图片，请改用本地服务器（python -m http.server）访问后再导出。");
+      }
+      return canvas;
     } finally {
       restore();
     }
