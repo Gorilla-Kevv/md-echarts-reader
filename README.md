@@ -36,6 +36,8 @@ A single-file, zero-build Markdown reader that turns `echarts` fenced code block
 
 安装：VS Code → 扩展 → 从 VSIX 安装，或用 VS Code 打开 `vscode-extension/` 按 F5 调试。详见 [`vscode-extension/README.md`](./vscode-extension/README.md)。
 
+预打包的 `.vsix` 见 [Releases](https://github.com/Gorilla-Kevv/md-echarts-reader/releases)；CI（`.github/workflows/package.yml`）会在每次 push 到 main 时自动打包并上传 artifact，打 `v*` 标签时自动发布 Release。
+
 ## 📦 单文件「快速查看」版
 
 想**双击一个文件就直接打开某篇文档**（无需选文件、无需命令行），把 Markdown 原文内嵌进阅读器即可：复制 `Markdown阅读器.html`，在主脚本之前加入
