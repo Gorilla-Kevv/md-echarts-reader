@@ -1,0 +1,9 @@
+.vscode/**
+.git/**
+.gitignore
+**/*.map
+node_modules/**
+.npm-cache/**
+*.vsix
+package-lock.json
+CHANGELOG.md

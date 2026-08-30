@@ -1,0 +1,112 @@
+{
+  "name": "md-echarts-preview",
+  "displayName": "Markdown + ECharts Preview",
+  "description": "Markdown 实时预览自定义编辑器：渲染 ```echarts 图表、KaTeX 公式、Mermaid 图、SVG 图片，支持滚动同步与导出 PDF / 图片 / HTML / Word。",
+  "version": "0.2.0",
+  "publisher": "gorilla-kevv",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gorilla-Kevv/md-echarts-reader"
+  },
+  "bugs": {
+    "url": "https://github.com/Gorilla-Kevv/md-echarts-reader/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "echarts",
+    "katex",
+    "mermaid",
+    "chart",
+    "图表",
+    "预览"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "mdEchartsPreview.open",
+        "title": "Markdown+ECharts: 打开侧边预览",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "mdEchartsPreview.editor",
+        "displayName": "Markdown + ECharts 预览",
+        "selector": [
+          {
+            "language": "markdown"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "mdEchartsPreview.open",
+          "when": "resourceLangId == markdown",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "mdEchartsPreview.open",
+          "when": "resourceLangId == markdown"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "mdEchartsPreview.open",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorTextFocus && resourceLangId == markdown"
+      }
+    ],
+    "configuration": {
+      "title": "Markdown + ECharts Preview",
+      "properties": {
+        "mdEchartsPreview.scrollSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用源编辑器与预览之间的滚动同步。"
+        },
+        "mdEchartsPreview.sectionNumbering": {
+          "type": "boolean",
+          "default": false,
+          "description": "为标题自动添加章节编号（如 1. / 1.1）。"
+        },
+        "mdEchartsPreview.math": {
+          "type": "boolean",
+          "default": true,
+          "description": "渲染 $...$ 与 $$...$$ 公式（KaTeX）。"
+        },
+        "mdEchartsPreview.mermaid": {
+          "type": "boolean",
+          "default": true,
+          "description": "渲染 ```mermaid 代码块为图表。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "npx @vscode/vsce package",
+    "package:vsix": "npx @vscode/vsce package --out md-echarts-preview.vsix"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1"
+  }
+}

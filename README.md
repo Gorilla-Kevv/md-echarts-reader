@@ -23,6 +23,19 @@ A single-file, zero-build Markdown reader that turns `echarts` fenced code block
 
 > ⚠️ **需联网**：`marked`、`ECharts`、`html2canvas`、`jsPDF` 均通过 jsDelivr CDN 加载。离线时正文可阅读，图表渲染与导出功能不可用。
 
+## 🧩 VS Code 扩展
+
+`vscode-extension/` 是一个 VS Code 插件，把同样的渲染能力带进编辑器，对齐 markdown-preview-enhanced 的「自定义编辑器」形态：
+
+- **自定义编辑器**：右键 `.md` → 打开方式 → 「Markdown + ECharts 预览」；或命令 / 快捷键 `Ctrl+Alt+M` 打开侧边预览
+- **实时预览**：边编辑边刷新（防抖 150ms），切换文件自动跟随
+- **图表与公式**：`echarts` 图表、KaTeX 公式（`$...$` / `$$...$$`）、Mermaid 图、SVG 图片
+- **滚动同步**：源编辑器与预览双向联动
+- **导出**：PDF / PNG / HTML / Word
+- **离线可用**：依赖已内置到 `media/`
+
+安装：VS Code → 扩展 → 从 VSIX 安装，或用 VS Code 打开 `vscode-extension/` 按 F5 调试。详见 [`vscode-extension/README.md`](./vscode-extension/README.md)。
+
 ## 📦 单文件「快速查看」版
 
 想**双击一个文件就直接打开某篇文档**（无需选文件、无需命令行），把 Markdown 原文内嵌进阅读器即可：复制 `Markdown阅读器.html`，在主脚本之前加入
@@ -80,6 +93,7 @@ python -m http.server 8000
 .
 ├── Markdown阅读器.html   # 阅读器本体（单文件）
 ├── demo.md               # 演示文档（含多种 ECharts 图表）
+├── vscode-extension/     # VS Code 扩展（自定义编辑器 + 实时预览 + 导出）
 ├── LICENSE
 └── README.md
 ```
@@ -88,10 +102,12 @@ python -m http.server 8000
 
 - [marked](https://github.com/markedjs/marked) — Markdown 解析
 - [Apache ECharts](https://echarts.apache.org/) — 图表渲染
+- [KaTeX](https://katex.org/) — 公式渲染（仅 VS Code 扩展）
+- [Mermaid](https://mermaid.js.org/) — 图表渲染（仅 VS Code 扩展）
 - [html2canvas](https://html2canvas.hertzen.com/) — 页面截图
 - [jsPDF](https://github.com/parallax/jsPDF) — 生成 PDF
 
-均为 CDN 引入，无需构建、无需安装。
+网页版均为 CDN 引入，无需构建；VS Code 扩展已把依赖内置到 `vscode-extension/media/`，离线可用。
 
 ## 📄 License
 
